@@ -1,0 +1,62 @@
+// src/db.js
+import pg from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const { Pool } = pg;
+
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+});
+
+// Crear tablas si no existen
+export const initDB = async () => {
+    const client = await pool.connect();
+    try {
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id          SERIAL PRIMARY KEY,
+                username    VARCHAR(50)  UNIQUE NOT NULL,
+                email       VARCHAR(255) UNIQUE NOT NULL,
+                password    VARCHAR(255) NOT NULL,
+                verified    BOOLEAN DEFAULT TRUE,
+                created_at  TIMESTAMP DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS orders (
+                id             SERIAL PRIMARY KEY,
+                order_id       INTEGER      NOT NULL,
+                user_email     VARCHAR(255) NOT NULL,
+                total          NUMERIC(10,2) NOT NULL,
+                currency       VARCHAR(5)   NOT NULL DEFAULT 'PEN',
+                payment_method VARCHAR(50)  NOT NULL,
+                status         VARCHAR(30)  NOT NULL DEFAULT 'pending',
+                form_data      JSONB,
+                created_at     TIMESTAMP DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS order_items (
+                id          SERIAL PRIMARY KEY,
+                order_id    INTEGER      NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+                product_id  VARCHAR(100) NOT NULL,
+                name        VARCHAR(255) NOT NULL,
+                price       NUMERIC(10,2) NOT NULL,
+                quantity    INTEGER NOT NULL,
+                image       TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_orders_user_email ON orders(user_email);
+            CREATE INDEX IF NOT EXISTS idx_orders_order_id   ON orders(order_id);
+        `);
+        console.log('✅ Base de datos inicializada correctamente');
+    } catch (err) {
+        console.error('❌ Error inicializando la BD:', err.message);
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
+export default pool;

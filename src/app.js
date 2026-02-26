@@ -1,20 +1,37 @@
+// src/app.js
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import emailRoutes from './routes/email.routes.js'; 
+import { initDB } from './db.js';
+
+import emailRoutes        from './routes/email.routes.js';
+import verificationRoutes from './routes/verification.routes.js';
+import ordersRoutes       from './routes/orders.routes.js';
+import authRoutes         from './routes/auth.routes.js';
 
 dotenv.config();
 
 const app = express();
 
 app.use(cors());
-app.use(express.json()); 
+app.use(express.json());
 
 app.get('/health', (req, res) => res.status(200).json({ status: 'up' }));
 
 app.use('/', emailRoutes);
+app.use('/', verificationRoutes);
+app.use('/', ordersRoutes);
+app.use('/', authRoutes);
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-    console.log(`🚀 Microservicio de correos corriendo en el puerto ${PORT}`);
-});
+
+initDB()
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`🚀 Servidor corriendo en el puerto ${PORT}`);
+        });
+    })
+    .catch(err => {
+        console.error('❌ No se pudo conectar a la BD:', err.message);
+        process.exit(1);
+    });
