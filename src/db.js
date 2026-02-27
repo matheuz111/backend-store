@@ -11,7 +11,6 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false },
 });
 
-// Crear tablas si no existen
 export const initDB = async () => {
     const client = await pool.connect();
     try {
@@ -21,9 +20,21 @@ export const initDB = async () => {
                 username    VARCHAR(50)  UNIQUE NOT NULL,
                 email       VARCHAR(255) UNIQUE NOT NULL,
                 password    VARCHAR(255) NOT NULL,
+                phone       VARCHAR(30)  DEFAULT NULL,
                 verified    BOOLEAN DEFAULT TRUE,
                 created_at  TIMESTAMP DEFAULT NOW()
             );
+
+            -- Añadir columna phone si ya existe la tabla sin ella
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'users' AND column_name = 'phone'
+                ) THEN
+                    ALTER TABLE users ADD COLUMN phone VARCHAR(30) DEFAULT NULL;
+                END IF;
+            END $$;
 
             CREATE TABLE IF NOT EXISTS orders (
                 id             SERIAL PRIMARY KEY,

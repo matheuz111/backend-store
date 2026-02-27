@@ -6,7 +6,7 @@ const SALT_ROUNDS = 10;
 
 /* ── Registro ── */
 export const registerController = async (req, res) => {
-    const { username, email, password } = req.body;
+    const { username, email, password, phone } = req.body;
 
     if (!username || !email || !password) {
         return res.status(400).json({ success: false, error: 'Todos los campos son requeridos.' });
@@ -16,7 +16,6 @@ export const registerController = async (req, res) => {
     }
 
     try {
-        // Verificar si ya existe
         const existing = await pool.query(
             'SELECT id FROM users WHERE username = $1 OR email = $2',
             [username, email]
@@ -28,14 +27,14 @@ export const registerController = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
         const result = await pool.query(
-            'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id, username, email, created_at',
-            [username, email, hashedPassword]
+            'INSERT INTO users (username, email, password, phone) VALUES ($1, $2, $3, $4) RETURNING id, username, email, phone, created_at',
+            [username, email, hashedPassword, phone || null]
         );
 
         const user = result.rows[0];
         res.status(201).json({
             success: true,
-            user: { id: user.id, username: user.username, email: user.email },
+            user: { id: user.id, username: user.username, email: user.email, phone: user.phone },
         });
     } catch (err) {
         console.error('❌ Error en registro:', err.message);
@@ -61,7 +60,7 @@ export const loginController = async (req, res) => {
             return res.status(401).json({ success: false, error: 'Usuario o contraseña incorrectos.' });
         }
 
-        const user = result.rows[0];
+        const user  = result.rows[0];
         const valid = await bcrypt.compare(password, user.password);
 
         if (!valid) {
@@ -70,7 +69,7 @@ export const loginController = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            user: { id: user.id, username: user.username, email: user.email },
+            user: { id: user.id, username: user.username, email: user.email, phone: user.phone },
         });
     } catch (err) {
         console.error('❌ Error en login:', err.message);
@@ -99,7 +98,7 @@ export const changePasswordController = async (req, res) => {
             return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
         }
 
-        const user = result.rows[0];
+        const user  = result.rows[0];
         const valid = await bcrypt.compare(currentPassword, user.password);
 
         if (!valid) {

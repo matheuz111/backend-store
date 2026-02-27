@@ -1,7 +1,7 @@
 // src/controllers/email.controller.js
 import { sendEmail } from '../services/email.service.js';
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'matheuscoronado06@gmail.com'; // ← cambia esto en tu .env
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'no-reply@kidstoreperu.com'; // ← cambia esto en tu .env
 
 export const sendReceiptController = async (req, res) => {
     const { email, customerName, orderId, total, items, paymentMethod, formData, currency } = req.body;
