@@ -4,19 +4,16 @@ import bcrypt from 'bcrypt';
 
 const SALT_ROUNDS = 10;
 
-/* ── Registro ── */
 export const registerController = async (req, res) => {
     const { username, email, password, phone } = req.body;
 
-    // Validación básica (el teléfono puede ser opcional según tu lógica, pero lo incluimos si viene)
     if (!username || !email || !password) {
-        return res.status(400).json({ error: 'Faltan campos obligatorios (username, email, password).' });
+        return res.status(400).json({ success: false, error: 'Faltan campos obligatorios.' });
     }
 
     try {
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-        // CORRECCIÓN: Se añade 'phone' a la consulta INSERT y a los parámetros
         const query = `
             INSERT INTO users (username, email, password, phone)
             VALUES ($1, $2, $3, $4)
@@ -25,13 +22,13 @@ export const registerController = async (req, res) => {
         const values = [username, email, hashedPassword, phone || null];
 
         const result = await pool.query(query, values);
-        res.status(201).json(result.rows[0]);
+        res.status(201).json({ success: true, user: result.rows[0] });
     } catch (error) {
         console.error('Error en registro:', error);
-        if (error.code === '23505') { // Error de duplicado en PostgreSQL
-            return res.status(400).json({ error: 'El usuario o correo ya existe.' });
+        if (error.code === '23505') {
+            return res.status(400).json({ success: false, error: 'El usuario o correo ya existe.' });
         }
-        res.status(500).json({ error: 'Error interno del servidor.' });
+        res.status(500).json({ success: false, error: 'Error interno del servidor.' });
     }
 };
 
