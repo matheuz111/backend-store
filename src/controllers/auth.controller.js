@@ -8,37 +8,63 @@ const SALT_ROUNDS = 10;
 export const registerController = async (req, res) => {
     const { username, email, password, phone } = req.body;
 
+    // Validación básica (el teléfono puede ser opcional según tu lógica, pero lo incluimos si viene)
     if (!username || !email || !password) {
-        return res.status(400).json({ success: false, error: 'Todos los campos son requeridos.' });
-    }
-    if (password.length < 6) {
-        return res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 6 caracteres.' });
+        return res.status(400).json({ error: 'Faltan campos obligatorios (username, email, password).' });
     }
 
     try {
-        const existing = await pool.query(
-            'SELECT id FROM users WHERE username = $1 OR email = $2',
-            [username, email]
-        );
-        if (existing.rows.length > 0) {
-            return res.status(409).json({ success: false, error: 'El usuario o correo ya existe.' });
-        }
-
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-        const result = await pool.query(
-            'INSERT INTO users (username, email, password, phone) VALUES ($1, $2, $3, $4) RETURNING id, username, email, phone, created_at',
-            [username, email, hashedPassword, phone || null]
-        );
+        // CORRECCIÓN: Se añade 'phone' a la consulta INSERT y a los parámetros
+        const query = `
+            INSERT INTO users (username, email, password, phone)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, username, email, phone
+        `;
+        const values = [username, email, hashedPassword, phone || null];
 
-        const user = result.rows[0];
-        res.status(201).json({
-            success: true,
-            user: { id: user.id, username: user.username, email: user.email, phone: user.phone },
-        });
-    } catch (err) {
-        console.error('❌ Error en registro:', err.message);
-        res.status(500).json({ success: false, error: 'Error interno del servidor.' });
+        const result = await pool.query(query, values);
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error('Error en registro:', error);
+        if (error.code === '23505') { // Error de duplicado en PostgreSQL
+            return res.status(400).json({ error: 'El usuario o correo ya existe.' });
+        }
+        res.status(500).json({ error: 'Error interno del servidor.' });
+    }
+};
+
+/* ── Actualización de Perfil ── */
+export const updateUserController = async (req, res) => {
+    const { email, username, phone } = req.body;
+
+    // El email es necesario para identificar al usuario pero no se modificará
+    if (!email) {
+        return res.status(400).json({ error: 'Se requiere el correo para identificar al usuario.' });
+    }
+
+    try {
+        // Solo actualizamos username y phone basándonos en el email
+        const query = `
+            UPDATE users 
+            SET username = COALESCE($1, username), 
+                phone = COALESCE($2, phone)
+            WHERE email = $3
+            RETURNING id, username, email, phone
+        `;
+        const values = [username, phone, email];
+
+        const result = await pool.query(query, values);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado.' });
+        }
+
+        res.json({ message: 'Perfil actualizado correctamente', user: result.rows[0] });
+    } catch (error) {
+        console.error('Error al actualizar usuario:', error);
+        res.status(500).json({ error: 'Error interno del servidor.' });
     }
 };
 
